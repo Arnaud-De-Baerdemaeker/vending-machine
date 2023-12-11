@@ -1,32 +1,49 @@
-import {createActor} from 'xstate';
 import {useMachine} from '@xstate/react';
 
 import vendingMachine from './machines/vendingMachine';
 
-import './App.css';
-import { useEffect } from 'react';
+import Button from './components/Button';
+import Drink from './components/Drink';
 
-function App() {
+import './App.css';
+
+const App = () => {
 	const [state, send] = useMachine(vendingMachine);
 
-	useEffect(() => {
-		console.log(state);
-	}, [state]);
-
 	return (
-		<div className="App">
-			<button onClick={() => {
-				state.value === "off" ? send({type: "turnOn"}) : alert("Machine is already on !")
-			}}>
-				Turn on
-			</button>
-			<button onClick={() => {
-				state.value !== "off" ? send({type: "turnOff"}) : alert("Machine is already off !")
-			}}>
-				Turn off
-			</button>
-		</div>
+		<main className="App">
+			<div>
+				<Button
+					clickFunction={() => {
+						state.matches("turnedOff") ? send({type: "turnOn"}) : alert("Machine is already on !")
+					}}
+				>
+					ON
+				</Button>
+				<Button
+					clickFunction={() => {
+						!state.matches("turnedOff") ? send({type: "turnOff"}) : alert("Machine is already off !")
+					}}
+				>
+					OFF
+				</Button>
+			</div>
+
+			<div>
+				{state.matches({turnedOn: {ready: "idle"}})
+					? state.context.drinks.map(drink => (
+						<Drink
+							key={drink.id}
+							drinkName={drink.name}
+							drinkPrice={drink.price}
+							drinkStock={drink.stock}
+						/>
+					))
+					: null
+				}
+			</div>
+		</main>
 	);
-}
+};
 
 export default App;
