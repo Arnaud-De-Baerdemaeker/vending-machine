@@ -8,9 +8,10 @@ const vendingMachine = createMachine(
 		context: {
 			welcomeMessage: null,
 			drinks: null,
+			totalDrinks: null,
 			errorFetching: null,
 		},
-		id: "distributeur",
+		id: "vendingMachine",
 		initial: "turnedOff",
 		states: {
 			turnedOff: {
@@ -28,15 +29,28 @@ const vendingMachine = createMachine(
 							src: fromPromise(() => fetchStock()),
 							onDone: [
 								{
-									target: "ready",
+									target: "contentFetched",
 									actions: assign({
 										drinks: ({context, event}) => event.output,
+										totalDrinks: ({context, event}) => {
+											let
+												total = null,
+												entries = event.output,
+												i
+											;
+
+											for(i = 0; i < entries.length; i++) {
+												total = total + entries[i].stock;
+											}
+
+											return total;
+										},
 									}),
 								},
 							],
 							onError: [
 								{
-									target: "machineEmpty",
+									target: "errorFetchingContent",
 									actions: assign({
 										drinks: ({context, event}) => event.error,
 									}),
@@ -44,54 +58,58 @@ const vendingMachine = createMachine(
 							],
 						},
 					},
+					contentFetched: {
+						always: [
+							{
+								target: "ready",
+								guard: ({context}) => {
+									return context.totalDrinks > 0;
+								},
+							},
+							{
+								target: "machineEmpty",
+							},
+						],
+					},
+					errorFetchingContent: {
+						on: {
+							retry: {
+								target: "initialization",
+							},
+						},
+					},
 					ready: {
 						initial: "idle",
 						states: {
 							idle: {
 								on: {
+									userInsertsMoney: {
+										target: "amountInserted",
+									},
+								},
+							},
+							amountInserted: {
+								on: {
 									userSelectsDrink: [
 										{
-											target: "displayPrice",
-											guard: "productAvailable",
+											target: "selection",
+											guard: "productStock > 0",
 										},
 										{
 											target: "productOutOfStock",
-										}
-									],
-									userInsertsMoney: {
-										target: "insertedMoney",
-									},
-								},
-							},
-							displayPrice: {
-								on: {
-									userInsertsMoney: [
-										{
-											target: "finalization",
-											guard: "amount >= price",
-										},
-										{
-											target: "displayPrice",
 										},
 									],
-								},
-							},
-							productOutOfStock: {
-								after: {
-									"5000": {
-										target: "#distributeur.turnedOn.ready.idle",
-									},
-								},
-							},
-							insertedMoney: {
-								on: {
 									userInsertsMoney: {
-										target: "insertedMoney",
+										target: "amountInserted",
 									},
-									userSelectsDrink: [
+								},
+							},
+							selection: {
+								on: {
+									validateSelection: [
 										{
-											target: "finalization",
-											guard: "amount >= price",
+											target: "Finalization",
+											guard: "amountInserted >= price",
 										},
 										{
 											target: "insufficientFunds",
@@ -99,10 +117,21 @@ const vendingMachine = createMachine(
 									],
 								},
 							},
-							finalization: {
+							productOutOfStock: {
 								after: {
 									"5000": {
-										target: "#distributeur.turnedOn.initialization",
+										target: "#vendingMachine.turnedOn.ready.amountInserted",
+										actions: [],
+										meta: {},
+									},
+								},
+							},
+							Finalization: {
+								after: {
+									"5000": {
+										target: "#vendingMachine.turnedOn.initialization",
+										actions: [],
+										meta: {},
 									},
 								},
 								states: {
@@ -121,22 +150,19 @@ const vendingMachine = createMachine(
 								type: "parallel",
 							},
 							insufficientFunds: {
-								on: {
-									userInsertsMoney: [
-										{
-											target: "finalization",
-											guard: "amount >= price",
-										},
-										{
-											target: "insufficientFunds",
-										},
-									],
+								always: {
+									target: "amountInserted",
 								},
 							},
 						},
 					},
 					machineEmpty: {
 						type: "final",
+					},
+				},
+				on: {
+					turnOff: {
+						target: "turnedOff",
 					},
 				},
 			},
