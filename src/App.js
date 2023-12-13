@@ -1,3 +1,4 @@
+import {useEffect} from 'react';
 import {useMachine} from '@xstate/react';
 
 import vendingMachine from './machines/vendingMachine';
@@ -9,6 +10,10 @@ import './App.css';
 
 const App = () => {
 	const [state, send] = useMachine(vendingMachine);
+
+	const coins = [0.05, 0.10, 0.20, 0.50, 1, 2];
+
+	useEffect(() => {console.log(state)}, [state]);
 
 	return (
 		<main className="App">
@@ -29,19 +34,50 @@ const App = () => {
 				</Button>
 			</div>
 
-			<div>
-				{state.matches({turnedOn: {ready: "idle"}})
-					? state.context.drinks.map(drink => (
-						<Drink
-							key={drink.id}
-							drinkName={drink.name}
-							drinkPrice={drink.price}
-							drinkStock={drink.stock}
-						/>
-					))
-					: null
-				}
-			</div>
+			{state.matches({turnedOn: "ready"})
+				&& (
+					<div>
+						<div>
+							{state.context.drinks.map(drink => (
+								<Drink
+									key={drink.id}
+									drinkName={drink.name}
+									drinkPrice={drink.price}
+									drinkStock={drink.stock}
+								/>
+							))}
+						</div>
+
+						<div>
+							<div>{state.context.insertedAmount}€</div>
+
+							<div>
+								{coins.map((coin, index) => (
+									<Button
+										key={index}
+										id={coin}
+										clickFunction={() => {
+											send({
+												type: "userInsertsMoney",
+												value: coin
+											});
+										}}
+									>
+										{coin}€
+									</Button>
+								))}
+								<Button
+									clickFunction={() => {
+										send({type: "returnMoney"});
+									}}
+								>
+									Annuler
+								</Button>
+							</div>
+						</div>
+					</div>
+				)
+			}
 		</main>
 	);
 };
