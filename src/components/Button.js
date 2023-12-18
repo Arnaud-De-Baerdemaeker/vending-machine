@@ -1,9 +1,9 @@
-const Button = (props) => {
+const Button = ({clickFunction, children}) => {
 	return(
 		<button
-			onClick={props.clickFunction}
+			onClick={clickFunction}
 		>
-			{props.children}
+			{children}
 		</button>
 	);
 };
