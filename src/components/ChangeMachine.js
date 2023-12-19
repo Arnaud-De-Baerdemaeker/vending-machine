@@ -13,11 +13,17 @@ const ChangeMachine = ({state, service}) => {
 						key={index}
 						id={coin}
 						clickFunction={() => {
-							service.send({
+							state.context.insertedAmount > 0
+							? service.send({
+								type: "INSERT_MONEY_AGAIN",
+								value: coin
+							})
+							: service.send({
 								type: "INSERT_MONEY",
 								value: coin
-							});
+							})
 						}}
+						isDisabled={state.can({type: "INSERT_MONEY"}) || state.can({type: "INSERT_MONEY_AGAIN"}) ? false : true}
 					>
 						{coin}€
 					</Button>
@@ -26,8 +32,9 @@ const ChangeMachine = ({state, service}) => {
 					clickFunction={() => {
 						service.send({type: "RETURN_MONEY"});
 					}}
+					isDisabled={state.can({type: "INSERT_MONEY"}) || state.can({type: "INSERT_MONEY_AGAIN"}) ? false : true}
 				>
-					Annuler
+					Retourner argent
 				</Button>
 			</div>
 		</div>
