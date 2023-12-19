@@ -5,15 +5,17 @@ const Switches = ({state, service}) => {
 		<div>
 			<Button
 				clickFunction={() => {
-					state.matches("turnedOff") ? service.send({type: "TURN_ON"}) : alert("Machine is already on !");
+					service.send({type: "TURN_ON"});
 				}}
+				isDisabled={state.can({type: "TURN_ON"}) ? false : true}
 			>
 				ON
 			</Button>
 			<Button
 				clickFunction={() => {
-					!state.matches("turnedOff") ? service.send({type: "TURN_OFF"}) : alert("Machine is already off !");
+					service.send({type: "TURN_OFF"});
 				}}
+				isDisabled={state.can({type: "TURN_OFF"}) ? false : true}
 			>
 				OFF
 			</Button>
