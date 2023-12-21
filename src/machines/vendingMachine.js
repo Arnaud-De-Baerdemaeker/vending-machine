@@ -1,6 +1,10 @@
 import {createMachine, assign, fromPromise} from "xstate";
 
-import fetchStock from "../apiCalls/fetchStock";
+import {fetchStock, updateStock} from "../apiCalls/stockManager";
+
+const roundNumber = (number) => {
+	return Math.round(number * 100) / 100;
+};
 
 const vendingMachine = createMachine(
 	{
@@ -14,6 +18,7 @@ const vendingMachine = createMachine(
 			selectedDrinkName: null,
 			selectedDrinkPrice: null,
 			selectedDrinkStock: null,
+			change: null,
 		},
 		id: "vendingMachine",
 		initial: "turnedOff",
@@ -91,7 +96,8 @@ const vendingMachine = createMachine(
 										target: "amountInserted",
 										actions: assign({
 											insertedAmount: ({context, event}) => {
-												return context.insertedAmount = context.insertedAmount + event.value;
+												let number = context.insertedAmount = context.insertedAmount + event.value;
+												return roundNumber(number);
 											},
 										}),
 									},
@@ -127,15 +133,18 @@ const vendingMachine = createMachine(
 									INSERT_MONEY_AGAIN: {
 										target: "amountInserted",
 										actions: assign({
-											insertedAmount: ({context, event}) => (
-												context.insertedAmount = context.insertedAmount + event.value
-											),
+											insertedAmount: ({context, event}) => {
+												let number = context.insertedAmount = context.insertedAmount + event.value;
+												return roundNumber(number);
+											},
 										})
 									},
 									RETURN_MONEY: {
 										target: "idle",
 										actions: assign({
-											insertedAmount: ({context, event}) => context.insertedAmount = 0,
+											insertedAmount: ({context, _}) => {
+												return context.insertedAmount = 0;
+											},
 										}),
 									},
 								},
@@ -144,11 +153,16 @@ const vendingMachine = createMachine(
 								on: {
 									VALIDATE_SELECTION: [
 										{
-											target: "Finalization",
-											guard: "amountInserted >= price",
+											target: "finalization",
+											guard: ({context, _}) => {
+												return context.insertedAmount >= context.selectedDrinkPrice;
+											},
 										},
 										{
 											target: "insufficientFunds",
+											actions: [
+												({}) => alert("Montant insuffisant"),
+											],
 										},
 									],
 									CANCEL_SELECTION: [
@@ -180,27 +194,65 @@ const vendingMachine = createMachine(
 									target: "#vendingMachine.turnedOn.ready.amountInserted",
 								},
 							},
-							Finalization: {
-								after: {
-									"5000": {
-										target: "#vendingMachine.turnedOn.initialization",
-										actions: [],
-									},
-								},
+							finalization: {
+								type: "parallel",
 								states: {
 									drinkDelivery: {
-										invoke: {
-											src: "updateDrinkStock",
-											id: "invoke-lazn1",
+										initial: "updatingStock",
+										states: {
+											updatingStock: {
+												invoke: {
+													src: fromPromise(({input: {id, name, price, stock}}) => {
+														return updateStock(id, name, price, stock);
+													}),
+													input: ({context, _}) => ({
+														id: context.selectedDrinkId,
+														name: context.selectedDrinkName,
+														price: context.selectedDrinkPrice,
+														stock: context.selectedDrinkStock,
+													}),
+													onDone: [
+														{
+															target: "stockUpdated",
+															actions: [
+																({}) => console.log("stock updated"),
+															],
+														},
+													],
+													onError: [],
+												},
+											},
+											stockUpdated: {
+												type: "final",
+											},
+										},
+										actions: [
+											({}) => alert("Vous pouvez prendre votre boisson"),
+										],
+									},
+									giveBackChange: {
+										type: "final",
+										actions: [
+											({context, _}) => {
+												let change = context.insertedAmount - context.selectedDrinkPrice;
+												alert(`Voici ${change}€ de retour`);
+											},
+										],
+										guard: ({context, _}) => {
+											return context.insertedAmount > context.selectedDrinkPrice;
 										},
 									},
-									giveBackChange: {},
 								},
-								always: {
-									target: ".giveBackChange",
-									guard: "amount > price",
+								onDone: {
+									target: "#vendingMachine.turnedOn.initialization",
+									actions: assign({
+										insertedAmount: ({}) => 0,
+										selectedDrinkId: ({}) => null,
+										selectedDrinkName: ({}) => null,
+										selectedDrinkPrice: ({}) => null,
+										selectedDrinkStock: ({}) => null,
+									}),
 								},
-								type: "parallel",
 							},
 							insufficientFunds: {
 								always: {
@@ -220,26 +272,6 @@ const vendingMachine = createMachine(
 				},
 			},
 		},
-	},
-	{
-		actors: {
-			updateDrinkStock: createMachine({}),
-		},
-		guards: {
-			"productAvailable": ({ context, event }, params) => {
-				return false;
-			},
-			"montant >= prix": ({ context, event }, params) => {
-				return false;
-			},
-			"amount >= price": ({ context, event }, params) => {
-				return false;
-			},
-			"amount > price": ({ context, event }, params) => {
-				return false;
-			},
-		},
-		delays: {},
 	},
 );
 
