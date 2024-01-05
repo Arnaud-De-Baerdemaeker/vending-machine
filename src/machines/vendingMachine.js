@@ -268,6 +268,9 @@ const vendingMachine = createMachine(
 				on: {
 					TURN_OFF: {
 						target: "turnedOff",
+						actions: assign({
+							insertedAmount: ({}) => 0,
+						}),
 					},
 				},
 			},
