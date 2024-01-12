@@ -18,7 +18,7 @@ const vendingMachine = createMachine(
 			selectedDrinkName: null,
 			selectedDrinkPrice: null,
 			selectedDrinkStock: null,
-			change: null,
+			change: 0,
 		},
 		id: "vendingMachine",
 		initial: "turnedOff",
@@ -195,7 +195,6 @@ const vendingMachine = createMachine(
 								},
 							},
 							finalization: {
-								type: "parallel",
 								states: {
 									drinkDelivery: {
 										initial: "updatingStock",
@@ -214,35 +213,49 @@ const vendingMachine = createMachine(
 													onDone: [
 														{
 															target: "stockUpdated",
-															actions: [
-																({}) => console.log("stock updated"),
-															],
 														},
 													],
-													onError: [],
 												},
 											},
 											stockUpdated: {
 												type: "final",
+												entry: [
+													({}) => console.log("stock updated"),
+												],
 											},
 										},
-										actions: [
+										entry: [
 											({}) => alert("Vous pouvez prendre votre boisson"),
 										],
 									},
 									giveBackChange: {
-										type: "final",
-										actions: [
-											({context, _}) => {
-												let change = context.insertedAmount - context.selectedDrinkPrice;
-												alert(`Voici ${change}€ de retour`);
+										initial: "prepareChange",
+										states: {
+											prepareChange: {
+												always: {
+													target: "changeBack",
+													actions: [
+														({context, _}) => {
+															return context.change = context.insertedAmount - context.selectedDrinkPrice;
+														},
+													],
+													guard: ({context, _}) => {
+														return context.insertedAmount > context.selectedDrinkPrice;
+													},
+												},
 											},
-										],
-										guard: ({context, _}) => {
-											return context.insertedAmount > context.selectedDrinkPrice;
+											changeBack: {
+												type: "final",
+												entry: [
+													({context, _}) => {
+														alert(`Voici ${context.change}€ de retour`);
+													},
+												],
+											},
 										},
 									},
 								},
+								type: "parallel",
 								onDone: {
 									target: "#vendingMachine.turnedOn.initialization",
 									actions: assign({
@@ -251,6 +264,7 @@ const vendingMachine = createMachine(
 										selectedDrinkName: ({}) => null,
 										selectedDrinkPrice: ({}) => null,
 										selectedDrinkStock: ({}) => null,
+										change: ({}) => 0,
 									}),
 								},
 							},
